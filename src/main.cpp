@@ -311,7 +311,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int showCommand) {
         L"ChassisDcoder - VIN Decoder",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT,
-        540, 450,
+        540, 520,
         nullptr, nullptr, instance, nullptr);
 
     if (!g_main) {
