@@ -78,7 +78,44 @@ void buildResults(const std::string& vin, std::string& summary, std::string& ful
     }
     out << "\r\n";
 
-    out << "Chassis-code attempt (Autel-style, heuristic):\r\n";
+    // NHTSA often omits lane/adaptive-cruise/collision fields even when
+    // the feature is fitted. Make that explicit instead of hiding it.
+    struct RequestedSafetyField {
+        const char* key;
+        const char* label;
+    };
+    const RequestedSafetyField requestedSafety[] = {
+        {"LaneDepartureWarning", "Lane Departure Warning"},
+        {"LaneKeepSystem", "Lane Keep Assist"},
+        {"LaneCenteringAssistance", "Lane Centering Assistance"},
+        {"AdaptiveCruiseControl", "Adaptive Cruise Control"},
+        {"ForwardCollisionWarning", "Forward Collision Warning"},
+        {"BlindSpotIntervention", "Blind Spot Intervention"},
+        {"RearCrossTrafficAlert", "Rear Cross-Traffic Alert"},
+        {"RearAutomaticEmergencyBraking", "Rear Automatic Emergency Braking"},
+        {"PedestrianAutomaticEmergencyBraking", "Pedestrian Automatic Emergency Braking"},
+        {"AutomaticPedestrianAlertingSound", "Automatic Pedestrian Alerting Sound"},
+        {"CIB", "Crash Imminent Braking (CIB)"},
+        {"DynamicBrakeSupport", "Dynamic Brake Support"},
+    };
+    std::vector<std::pair<std::string, std::string>> missingSafety;
+    for (const auto& rf : requestedSafety) {
+        auto it = info.fields.find(rf.key);
+        if (it == info.fields.end() || it->second.empty()) {
+            missingSafety.emplace_back(rf.label, "(not reported by NHTSA; may still be equipped)");
+        }
+    }
+    out << "Lane, adaptive-cruise, and collision-detection fields:\r\n";
+    if (missingSafety.empty()) {
+        out << "  All tracked fields above were reported by NHTSA.\r\n";
+    } else {
+        out << "  NHTSA did not report these values for this VIN:\r\n";
+        for (const auto& kv : missingSafety) {
+            out << "    " << kv.first << ": " << kv.second << "\r\n";
+        }
+        out << "  Note: a blank NHTSA value does not prove the feature is absent.\r\n";
+    }
+    out << "\r\n";
     if (!makeHasChassisHeuristics(info.make)) {
         out << "  No chassis-code heuristic for make '" << info.make << "'.\r\n";
     } else {
