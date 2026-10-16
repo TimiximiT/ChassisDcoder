@@ -7,6 +7,12 @@ Desktop GUI application that decodes a vehicle VIN via the NHTSA VPIC API and re
 
 Supported chassis-code heuristics: BMW, MINI, Mercedes-Benz, Mazda, Toyota, Nissan, Subaru. Other makes return "no heuristic available".
 
+## Download
+Download the latest Windows release here:
+https://github.com/TimiximiT/ChassisDcoder/releases/latest
+
+The `chassisdcoder.exe` build is statically linked and does not require a separate runtime.
+
 ## Running (distributed build)
 - `dist/ChassisDcoder.exe` (statically linked; no separate runtime needed).
 - Enter a VIN and click **Decode**.
