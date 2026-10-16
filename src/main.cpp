@@ -141,13 +141,18 @@ void buildResults(const std::string& vin, std::string& summary, std::string& ful
     details << "Year:  " << (info.year.empty() ? "(unknown)" : info.year) << "\r\n";
     details << "Make:  " << (info.make.empty() ? "(unknown)" : info.make) << "\r\n";
     details << "Model: " << (info.model.empty() ? "(unknown)" : info.model) << "\r\n\r\n";
-    details << "All NHTSA fields:\r\n";
+    details << "NHTSA fields with data:\r\n";
     if (info.fields.empty()) {
         details << "  (none)\r\n";
     } else {
+        bool anyDetail = false;
         for (const auto& kv : info.fields) {
-            details << "  " << kv.first << ": "
-                    << (kv.second.empty() ? "(blank)" : kv.second) << "\r\n";
+            if (kv.second.empty()) continue;
+            anyDetail = true;
+            details << "  " << kv.first << ": " << kv.second << "\r\n";
+        }
+        if (!anyDetail) {
+            details << "  (no non-blank fields returned)\r\n";
         }
     }
     details << "\r\nChassis-code attempt (Autel-style, heuristic):\r\n";
@@ -221,22 +226,27 @@ namespace {
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
     case WM_CREATE: {
-        g_font = static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
+        g_font = CreateFontW(16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+            CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
+        if (!g_font) {
+            g_font = static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
+        }
 
         CreateWindowW(L"STATIC", L"VIN:", WS_CHILD | WS_VISIBLE,
             10, 14, 40, 20, hwnd, nullptr, nullptr, nullptr);
         g_vinEdit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"",
             WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL,
-            50, 10, 360, 24, hwnd, reinterpret_cast<HMENU>(ID_VIN_EDIT), nullptr, nullptr);
+            70, 16, 540, 28, hwnd, reinterpret_cast<HMENU>(ID_VIN_EDIT), nullptr, nullptr);
         g_decodeButton = CreateWindowW(L"BUTTON", L"Decode",
             WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON,
-            420, 10, 100, 24, hwnd, reinterpret_cast<HMENU>(ID_DECODE_BUTTON), nullptr, nullptr);
+            620, 16, 110, 28, hwnd, reinterpret_cast<HMENU>(ID_DECODE_BUTTON), nullptr, nullptr);
         g_resultEdit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"",
             WS_CHILD | WS_VISIBLE | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY | WS_VSCROLL,
-            10, 46, 510, 360, hwnd, reinterpret_cast<HMENU>(ID_RESULT_EDIT), nullptr, nullptr);
+            24, 56, 704, 500, hwnd, reinterpret_cast<HMENU>(ID_RESULT_EDIT), nullptr, nullptr);
         g_fullDetailsButton = CreateWindowW(L"BUTTON", L"Full Details",
             WS_CHILD | WS_TABSTOP | BS_PUSHBUTTON,
-            10, 412, 130, 26, hwnd, reinterpret_cast<HMENU>(ID_FULLDETAILS_BUTTON), nullptr, nullptr);
+            24, 566, 150, 28, hwnd, reinterpret_cast<HMENU>(ID_FULLDETAILS_BUTTON), nullptr, nullptr);
 
         if (g_font) {
             SendMessageW(g_vinEdit, WM_SETFONT, reinterpret_cast<WPARAM>(g_font), TRUE);
@@ -348,7 +358,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int showCommand) {
         L"ChassisDcoder - VIN Decoder",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT,
-        540, 520,
+        760, 680,
         nullptr, nullptr, instance, nullptr);
 
     if (!g_main) {
