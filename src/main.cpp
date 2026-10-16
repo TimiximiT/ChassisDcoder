@@ -12,6 +12,7 @@ enum {
     ID_VIN_EDIT = 100,
     ID_DECODE_BUTTON = 101,
     ID_RESULT_EDIT = 102,
+    ID_FULLDETAILS_BUTTON = 103,
     WM_DECODE_DONE = WM_APP + 1
 };
 
@@ -19,6 +20,10 @@ HWND g_main = nullptr;
 HWND g_vinEdit = nullptr;
 HWND g_decodeButton = nullptr;
 HWND g_resultEdit = nullptr;
+HWND g_fullDetailsButton = nullptr;
+std::string g_lastSummary;
+std::string g_lastFullDetails;
+bool g_showingFullDetails = false;
 HFONT g_font = nullptr;
 
 HANDLE g_thread = nullptr;
@@ -47,8 +52,9 @@ struct DecodeTask {
     HWND hwnd;
 };
 
-std::string buildResult(const std::string& vin) {
+void buildResults(const std::string& vin, std::string& summary, std::string& fullDetails) {
     std::ostringstream out;
+    std::ostringstream details;
     std::string error;
     VehicleInfo info = decodeVin(vin, error);
 
@@ -87,12 +93,51 @@ std::string buildResult(const std::string& vin) {
             out << "  These are estimates; confirm against the vehicle/Autel database.\r\n";
         }
     }
-    return out.str();
+    summary = out.str();
+
+    details << "Full decoded vehicle details\r\n";
+    details << "============================\r\n\r\n";
+    if (!error.empty()) {
+        details << "Note: " << error << "\r\n\r\n";
+    }
+    details << "VIN:   " << (info.vin.empty() ? vin : info.vin) << "\r\n";
+    details << "Year:  " << (info.year.empty() ? "(unknown)" : info.year) << "\r\n";
+    details << "Make:  " << (info.make.empty() ? "(unknown)" : info.make) << "\r\n";
+    details << "Model: " << (info.model.empty() ? "(unknown)" : info.model) << "\r\n\r\n";
+    details << "All NHTSA fields:\r\n";
+    if (info.fields.empty()) {
+        details << "  (none)\r\n";
+    } else {
+        for (const auto& kv : info.fields) {
+            details << "  " << kv.first << ": "
+                    << (kv.second.empty() ? "(blank)" : kv.second) << "\r\n";
+        }
+    }
+    details << "\r\nChassis-code attempt (Autel-style, heuristic):\r\n";
+    if (!makeHasChassisHeuristics(info.make)) {
+        details << "  No chassis-code heuristic for make '" << info.make << "'.\r\n";
+    } else {
+        auto guesses = decodeChassis(info.make, info.model, info.year);
+        if (guesses.empty()) {
+            details << "  No year/model-specific guess available. Verify physically.\r\n";
+        } else {
+            for (const auto& g : guesses) {
+                details << "  " << g.code << " - " << g.note
+                        << " [" << g.confidence << "]\r\n";
+            }
+        }
+    }
+    fullDetails = details.str();
 }
 
 DWORD WINAPI DecodeProc(LPVOID param) {
     std::unique_ptr<DecodeTask> task(static_cast<DecodeTask*>(param));
-    std::string result = buildResult(task->vin);
+    std::string result;
+    std::string fullDetails;
+    buildResults(task->vin, result, fullDetails);
+    g_lastSummary = result;
+    g_lastFullDetails = fullDetails;
+    g_showingFullDetails = false;
     std::string* payload = new std::string(std::move(result));
     if (!PostMessage(task->hwnd, WM_DECODE_DONE, 0, reinterpret_cast<LPARAM>(payload))) {
         delete payload;
@@ -120,6 +165,8 @@ void StartDecode() {
     EnableWindow(g_decodeButton, FALSE);
     SetWindowTextW(g_decodeButton, L"Decoding...");
     SetResultText(L"Please wait, contacting NHTSA...");
+    ShowWindow(g_fullDetailsButton, SW_HIDE);
+    g_showingFullDetails = false;
 
     DecodeTask* task = new DecodeTask{vin, g_main};
     g_thread = CreateThread(nullptr, 0, DecodeProc, task, 0, nullptr);
@@ -150,11 +197,15 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         g_resultEdit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"",
             WS_CHILD | WS_VISIBLE | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY | WS_VSCROLL,
             10, 46, 510, 360, hwnd, reinterpret_cast<HMENU>(ID_RESULT_EDIT), nullptr, nullptr);
+        g_fullDetailsButton = CreateWindowW(L"BUTTON", L"Full Details",
+            WS_CHILD | WS_TABSTOP | BS_PUSHBUTTON,
+            10, 412, 130, 26, hwnd, reinterpret_cast<HMENU>(ID_FULLDETAILS_BUTTON), nullptr, nullptr);
 
         if (g_font) {
             SendMessageW(g_vinEdit, WM_SETFONT, reinterpret_cast<WPARAM>(g_font), TRUE);
             SendMessageW(g_decodeButton, WM_SETFONT, reinterpret_cast<WPARAM>(g_font), TRUE);
             SendMessageW(g_resultEdit, WM_SETFONT, reinterpret_cast<WPARAM>(g_font), TRUE);
+            SendMessageW(g_fullDetailsButton, WM_SETFONT, reinterpret_cast<WPARAM>(g_font), TRUE);
         }
 
         SetWindowTextW(g_resultEdit, L"Enter a 17-character VIN and click Decode.");
@@ -164,6 +215,18 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     case WM_COMMAND:
         if (LOWORD(wParam) == ID_DECODE_BUTTON && HIWORD(wParam) == BN_CLICKED) {
             StartDecode();
+            return 0;
+        }
+        if (LOWORD(wParam) == ID_FULLDETAILS_BUTTON && HIWORD(wParam) == BN_CLICKED) {
+            if (g_showingFullDetails) {
+                SetWindowTextW(g_resultEdit, utf8ToWide(g_lastSummary).c_str());
+                SetWindowTextW(g_fullDetailsButton, L"Full Details");
+                g_showingFullDetails = false;
+            } else {
+                SetWindowTextW(g_resultEdit, utf8ToWide(g_lastFullDetails).c_str());
+                SetWindowTextW(g_fullDetailsButton, L"Summary");
+                g_showingFullDetails = true;
+            }
             return 0;
         }
         return 0;
@@ -180,10 +243,16 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         if (payload) {
             SetWindowTextW(g_resultEdit, utf8ToWide(*payload).c_str());
             delete payload;
+        } else {
+            SetWindowTextW(g_resultEdit, utf8ToWide(g_lastSummary).c_str());
         }
         g_decoding = false;
         EnableWindow(g_decodeButton, TRUE);
         SetWindowTextW(g_decodeButton, L"Decode");
+        ShowWindow(g_fullDetailsButton, SW_SHOW);
+        EnableWindow(g_fullDetailsButton, TRUE);
+        SetWindowTextW(g_fullDetailsButton, L"Full Details");
+        g_showingFullDetails = false;
         if (g_thread) {
             CloseHandle(g_thread);
             g_thread = nullptr;

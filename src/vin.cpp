@@ -125,6 +125,8 @@ const AdasKey kAdasKeys[] = {
     {"SemiautomaticHeadlampBeamSwitching", "Semi-Automatic Headlamp Beam Switching"},
     {"AdaptiveDrivingBeam", "Adaptive Driving Beam"},
     {"AdaptiveHeadlights", "Adaptive Headlights"},
+    {"LowerBeamHeadlampLightSource", "Lower Beam Headlamp Light Source"},
+    {"UpperBeamHeadlampLightSource", "Upper Beam Headlamp Light Source"},
     {"AutoReverseSystem", "Auto Reverse System"},
     {"CombinedBrakingSystem", "Combined Braking System"},
 };
