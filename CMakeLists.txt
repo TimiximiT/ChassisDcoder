@@ -5,8 +5,26 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# GUI application
 add_executable(chassisdcoder WIN32
     src/main.cpp
+    src/report.cpp
+    src/http.cpp
+    src/vin.cpp
+    src/chassis.cpp
+    src/chassis_bmw.cpp
+    src/chassis_mini.cpp
+    src/chassis_mercedes.cpp
+    src/chassis_mazda.cpp
+    src/chassis_toyota.cpp
+    src/chassis_nissan.cpp
+    src/chassis_subaru.cpp
+)
+
+# Console application
+add_executable(chassisdcoder_console
+    src/console_main.cpp
+    src/report.cpp
     src/http.cpp
     src/vin.cpp
     src/chassis.cpp
@@ -20,19 +38,23 @@ add_executable(chassisdcoder WIN32
 )
 
 target_include_directories(chassisdcoder PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_include_directories(chassisdcoder_console PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 # MinGW/Windows: link WinHTTP for HTTPS requests to NHTSA.
 if (WIN32)
     target_link_libraries(chassisdcoder PRIVATE winhttp)
+    target_link_libraries(chassisdcoder_console PRIVATE winhttp)
 endif()
 
 if (MSVC)
     target_compile_options(chassisdcoder PRIVATE /W4)
+    target_compile_options(chassisdcoder_console PRIVATE /W4)
 else()
     target_compile_options(chassisdcoder PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(chassisdcoder_console PRIVATE -Wall -Wextra -Wpedantic)
     if (MINGW)
         target_link_options(chassisdcoder PRIVATE -static -static-libgcc -static-libstdc++)
+        target_link_options(chassisdcoder_console PRIVATE -static -static-libgcc -static-libstdc++)
     endif()
-
 endif()
 

@@ -35,19 +35,25 @@ jobs:
 
       - name: Build
         shell: msys2 {0}
-        run: cmake --build build --target chassisdcoder --parallel
+        run: cmake --build build --parallel
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             build/chassisdcoder.exe
+            build/chassisdcoder_console.exe
           name: ChassisDcoder ${{ github.ref_name }}
           body: |
-            Windows GUI build.
+            Windows GUI and console builds.
 
-            - Enter a VIN and click Decode.
-            - Requires network access to vpic.nhtsa.dot.gov.
+            GUI: chassisdcoder.exe
+
+            Console usage:
+            - chassisdcoder_console.exe <VIN> [--full]
+            - If the VIN is omitted, the program prompts for one.
+
+            Both require network access to vpic.nhtsa.dot.gov.
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

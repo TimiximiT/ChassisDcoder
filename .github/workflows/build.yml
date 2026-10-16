@@ -34,11 +34,13 @@ jobs:
 
       - name: Build
         shell: msys2 {0}
-        run: cmake --build build --target chassisdcoder --parallel
+        run: cmake --build build --parallel
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
           name: ChassisDcoder-windows
-          path: build/chassisdcoder.exe
+          path: |
+            build/chassisdcoder.exe
+            build/chassisdcoder_console.exe
           if-no-files-found: error

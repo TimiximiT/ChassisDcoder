@@ -1,4 +1,5 @@
 #include "chassis.h"
+#include "report.h"
 #include "vin.h"
 
 #include <windows.h>
@@ -52,103 +53,15 @@ struct DecodeTask {
     HWND hwnd;
 };
 
-void buildResults(const std::string& vin, std::string& summary, std::string& fullDetails) {
-    std::ostringstream out;
-    std::ostringstream details;
-    std::string error;
-    VehicleInfo info = decodeVin(vin, error);
 
-    if (!error.empty()) {
-        out << "Note: " << error << "\r\n\r\n";
-    }
-
-    out << "VIN:   " << (info.vin.empty() ? vin : info.vin) << "\r\n";
-    out << "Year:  " << (info.year.empty() ? "(unknown)" : info.year) << "\r\n";
-    out << "Make:  " << (info.make.empty() ? "(unknown)" : info.make) << "\r\n";
-    out << "Model: " << (info.model.empty() ? "(unknown)" : info.model) << "\r\n";
-    auto trimIt = info.fields.find("Trim");
-    if (trimIt != info.fields.end() && !trimIt->second.empty()) {
-        out << "Trim:  " << trimIt->second << "\r\n";
-    }
-    out << "\r\n";
-
-    out << "Chassis Code:\r\n";
-    if (!makeHasChassisHeuristics(info.make)) {
-        out << "  No chassis-code heuristic for make '" << info.make << "'.\r\n";
-    } else {
-        auto guesses = decodeChassis(info.make, info.model, info.year);
-        if (guesses.empty()) {
-            out << "  No year/model-specific guess available. Verify physically.\r\n";
-        } else {
-            for (const auto& g : guesses) {
-                out << "  Chassis Code: " << g.code
-                    << "  (" << g.note << ") [" << g.confidence << "]\r\n";
-            }
-            out << "  These are estimates; confirm against the vehicle/Autel database.\r\n";
-        }
-    }
-    out << "\r\n";
-
-    auto adas = adasItems(info);
-    out << "ADAS / Safety features (NHTSA data present):\r\n";
-    if (adas.empty()) {
-        out << "  (none reported)\r\n";
-    } else {
-        for (const auto& kv : adas) {
-            out << "  " << kv.first << ": " << kv.second << "\r\n";
-        }
-    }
-    out << "\r\n";
-
-    out << "Note: The manufacturer may not report all safety features to NHTSA.\r\n";
-    out << "A blank NHTSA value does not prove a feature is absent.\r\n\r\n";
-    summary = out.str();
-
-    details << "Full decoded vehicle details\r\n";
-    details << "============================\r\n\r\n";
-    if (!error.empty()) {
-        details << "Note: " << error << "\r\n\r\n";
-    }
-    details << "VIN:   " << (info.vin.empty() ? vin : info.vin) << "\r\n";
-    details << "Year:  " << (info.year.empty() ? "(unknown)" : info.year) << "\r\n";
-    details << "Make:  " << (info.make.empty() ? "(unknown)" : info.make) << "\r\n";
-    details << "Model: " << (info.model.empty() ? "(unknown)" : info.model) << "\r\n\r\n";
-    details << "NHTSA fields with data:\r\n";
-    if (info.fields.empty()) {
-        details << "  (none)\r\n";
-    } else {
-        bool anyDetail = false;
-        for (const auto& kv : info.fields) {
-            if (kv.second.empty()) continue;
-            anyDetail = true;
-            details << "  " << kv.first << ": " << kv.second << "\r\n";
-        }
-        if (!anyDetail) {
-            details << "  (no non-blank fields returned)\r\n";
-        }
-    }
-    details << "\r\nChassis-code attempt (Autel-style, heuristic):\r\n";
-    if (!makeHasChassisHeuristics(info.make)) {
-        details << "  No chassis-code heuristic for make '" << info.make << "'.\r\n";
-    } else {
-        auto guesses = decodeChassis(info.make, info.model, info.year);
-        if (guesses.empty()) {
-            details << "  No year/model-specific guess available. Verify physically.\r\n";
-        } else {
-            for (const auto& g : guesses) {
-                details << "  " << g.code << " - " << g.note
-                        << " [" << g.confidence << "]\r\n";
-            }
-        }
-    }
-    fullDetails = details.str();
-}
 
 DWORD WINAPI DecodeProc(LPVOID param) {
     std::unique_ptr<DecodeTask> task(static_cast<DecodeTask*>(param));
+    std::string error;
+    VehicleInfo info = decodeVin(task->vin, error);
     std::string result;
     std::string fullDetails;
-    buildResults(task->vin, result, fullDetails);
+    buildVinReport(info, task->vin, error, result, fullDetails);
     g_lastSummary = result;
     g_lastFullDetails = fullDetails;
     g_showingFullDetails = false;
